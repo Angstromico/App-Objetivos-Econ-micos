@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import { Proyecto, ItemRequerido, EstadoItem, Gama } from '@/core/interfaces/models'
+import { ref, computed } from 'vue'
+import { Proyecto, ItemRequerido, EstadoItem, Gama, ProgresoProyecto, TipoItem } from '@/core/interfaces/models'
 import { storageGet, storageSet } from '@/core/db/storage'
 
 export const useProyectosStore = defineStore('proyectos', () => {
@@ -122,6 +122,38 @@ export const useProyectosStore = defineStore('proyectos', () => {
     await storageSet(STORAGE_KEY, proyectos.value)
   }
 
+  /**
+   * Calcula el progreso financiero de un proyecto específico.
+   */
+  const progresoDeProyecto = computed(() => (proyectoId: string): ProgresoProyecto => {
+    const proyecto = proyectos.value.find(p => p.id === proyectoId)
+    if (!proyecto) {
+      return { costoMinimo: 0, costoIdeal: 0, porcentajeMinimo: 0, porcentajeIdeal: 0 }
+    }
+
+    const itemsPendientes = proyecto.items.filter(
+      i => !i.yaLoTenemos && i.estado !== EstadoItem.Logrado
+    )
+
+    const costoMinimo = itemsPendientes
+      .filter(i => i.tipo === TipoItem.Obligatorio)
+      .reduce((sum, i) => sum + i.presupuestoGama[i.gamaSeleccionada], 0)
+
+    const costoIdeal = itemsPendientes
+      .reduce((sum, i) => sum + i.presupuestoGama[i.gamaSeleccionada], 0)
+
+    return {
+      costoMinimo,
+      costoIdeal,
+      porcentajeMinimo: costoMinimo > 0 
+        ? Math.min(100, (proyecto.ahorroActual / costoMinimo) * 100) 
+        : 100,
+      porcentajeIdeal: costoIdeal > 0 
+        ? Math.min(100, (proyecto.ahorroActual / costoIdeal) * 100) 
+        : 100,
+    }
+  })
+
   return {
     proyectos,
     cargando,
@@ -133,5 +165,6 @@ export const useProyectosStore = defineStore('proyectos', () => {
     moverItem,
     setGamaItem,
     setGamaGlobal,
+    progresoDeProyecto,
   }
 })
