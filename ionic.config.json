@@ -1,0 +1,7 @@
+{
+  "name": "objetivos-economicos-app",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "vue-vite"
+}
