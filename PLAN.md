@@ -32,7 +32,7 @@ pnpm add -D @types/sortablejs
 ---
 
 ## MILESTONE 1 — Core: Interfaces y Adaptador de Storage
-**Estado:** ⬜  
+**Estado:** 🔄  
 **Toca archivos:**
 - `src/core/interfaces/models.ts` ← CREAR
 - `src/core/db/storage.ts` ← CREAR
