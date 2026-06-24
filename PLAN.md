@@ -8,7 +8,7 @@
 ---
 
 ## MILESTONE 0 — Instalación de Dependencias
-**Estado:** ⬜  
+**Estado:** ✅  
 **Toca archivos:** `package.json`, `src/main.ts`
 
 ### Paso 0.1 — Instalar paquetes necesarios
