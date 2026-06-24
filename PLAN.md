@@ -98,7 +98,7 @@ export function deserializarSnapshot(json: string): Proyecto[]
 
 ## MILESTONE 2 — Store de Pinia (Lógica de Negocio Completa)
 
-**Estado:** ⬜  
+**Estado:** ✅  
 **Toca archivos:**
 
 - `src/stores/proyectos.store.ts` ← CREAR

@@ -2,161 +2,136 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { Proyecto, ItemRequerido, EstadoItem, Gama, ProgresoProyecto, TipoItem } from '@/core/interfaces/models'
 import { storageGet, storageSet } from '@/core/db/storage'
+import { serializarSnapshot, deserializarSnapshot } from '@/core/utils/json-io'
 
 export const useProyectosStore = defineStore('proyectos', () => {
-  // State
   const proyectos = ref<Proyecto[]>([])
   const cargando = ref<boolean>(false)
 
-  const STORAGE_KEY = 'proyectos_v1'
+  const progresoDeProyecto = computed(() => (proyectoId: string): ProgresoProyecto => {
+    const proyecto = proyectos.value.find(p => p.id === proyectoId)
+    if (!proyecto) return { costoMinimo: 0, costoIdeal: 0, porcentajeMinimo: 0, porcentajeIdeal: 0 }
 
-  /**
-   * Carga los proyectos persistidos en el storage local.
-   */
+    const itemsPendientes = proyecto.items.filter(i => !i.yaLoTenemos && i.estado !== EstadoItem.Logrado)
+
+    const costoMinimo = itemsPendientes
+      .filter(i => i.tipo === TipoItem.Obligatorio)
+      .reduce((sum, i) => {
+        const gama = i.gamaSeleccionada
+        return sum + (i.presupuestoGama[gama] || 0)
+      }, 0)
+
+    const costoIdeal = itemsPendientes
+      .reduce((sum, i) => {
+        const gama = i.gamaSeleccionada
+        return sum + (i.presupuestoGama[gama] || 0)
+      }, 0)
+
+    return {
+      costoMinimo,
+      costoIdeal,
+      porcentajeMinimo: costoMinimo > 0 ? Math.min(100, (proyecto.ahorroActual / costoMinimo) * 100) : 100,
+      porcentajeIdeal:  costoIdeal  > 0 ? Math.min(100, (proyecto.ahorroActual / costoIdeal)  * 100) : 100,
+    }
+  })
+
   async function cargarProyectos(): Promise<void> {
     cargando.value = true
     try {
-      const data = await storageGet<Proyecto[]>(STORAGE_KEY)
-      if (data) {
-        proyectos.value = data
-      }
-    } catch (error) {
-      console.warn('Error cargando proyectos desde storage:', error)
+      const data = await storageGet<Proyecto[]>('proyectos_v1')
+      proyectos.value = data || []
+    } catch {
+      proyectos.value = []
     } finally {
       cargando.value = false
     }
   }
 
-  /**
-   * Crea o actualiza un proyecto.
-   */
-  async function guardarProyecto(proyecto: Proyecto): Promise<void> {
-    const index = proyectos.value.findIndex(p => p.id === proyecto.id)
+  async function guardarProyecto(p: Proyecto): Promise<void> {
+    const index = proyectos.value.findIndex(proj => proj.id === p.id)
     if (index >= 0) {
-      proyectos.value[index] = proyecto
+      proyectos.value[index] = p
     } else {
-      proyectos.value.push(proyecto)
+      proyectos.value.push(p)
     }
-    await storageSet(STORAGE_KEY, proyectos.value)
+    await storageSet('proyectos_v1', proyectos.value)
   }
 
-  /**
-   * Elimina un proyecto por su ID.
-   */
   async function eliminarProyecto(id: string): Promise<void> {
-    proyectos.value = proyectos.value.filter(p => p.id !== id)
-    await storageSet(STORAGE_KEY, proyectos.value)
+    proyectos.value = proyectos.value.filter(proj => proj.id !== id)
+    await storageSet('proyectos_v1', proyectos.value)
   }
 
-  /**
-   * Crea o actualiza un ítem dentro de un proyecto.
-   */
   async function guardarItem(proyectoId: string, item: ItemRequerido): Promise<void> {
     const proyecto = proyectos.value.find(p => p.id === proyectoId)
-    if (!proyecto) {
-      throw new Error(`Proyecto con ID ${proyectoId} no encontrado.`)
+    if (proyecto) {
+      const index = proyecto.items.findIndex(i => i.id === item.id)
+      if (index >= 0) {
+        proyecto.items[index] = item
+      } else {
+        proyecto.items.push(item)
+      }
+      proyecto.actualizadoEn = new Date().toISOString()
+      await storageSet('proyectos_v1', proyectos.value)
     }
-
-    const itemIndex = proyecto.items.findIndex(i => i.id === item.id)
-    if (itemIndex >= 0) {
-      proyecto.items[itemIndex] = item
-    } else {
-      proyecto.items.push(item)
-    }
-    await storageSet(STORAGE_KEY, proyectos.value)
   }
 
-  /**
-   * Elimina un ítem de un proyecto.
-   */
   async function eliminarItem(proyectoId: string, itemId: string): Promise<void> {
     const proyecto = proyectos.value.find(p => p.id === proyectoId)
-    if (!proyecto) {
-      throw new Error(`Proyecto con ID ${proyectoId} no encontrado.`)
+    if (proyecto) {
+      proyecto.items = proyecto.items.filter(i => i.id !== itemId)
+      proyecto.actualizadoEn = new Date().toISOString()
+      await storageSet('proyectos_v1', proyectos.value)
     }
-
-    proyecto.items = proyecto.items.filter(i => i.id !== itemId)
-    await storageSet(STORAGE_KEY, proyectos.value)
   }
 
-  /**
-   * Cambia el estado de un ítem (para Kanban/Tabs).
-   */
-  async function moverItem(proyectoId: string, itemId: string, nuevoEstado: EstadoItem): Promise<void> {
+  function moverItem(proyectoId: string, itemId: string, nuevoEstado: EstadoItem): void {
     const proyecto = proyectos.value.find(p => p.id === proyectoId)
-    const item = proyecto?.items.find(i => i.id === itemId)
-
-    if (!item) {
-      throw new Error(`Ítem con ID ${itemId} no encontrado en el proyecto ${proyectoId}.`)
+    if (proyecto) {
+      const item = proyecto.items.find(i => i.id === itemId)
+      if (item) {
+        item.estado = nuevoEstado
+        proyecto.actualizadoEn = new Date().toISOString()
+        void storageSet('proyectos_v1', proyectos.value)
+      }
     }
-
-    item.estado = nuevoEstado
-    await storageSet(STORAGE_KEY, proyectos.value)
   }
 
-  /**
-   * Actualiza la gama seleccionada para un ítem específico.
-   */
-  async function setGamaItem(proyectoId: string, itemId: string, gama: Gama): Promise<void> {
+  function setGamaItem(proyectoId: string, itemId: string, gama: Gama): void {
     const proyecto = proyectos.value.find(p => p.id === proyectoId)
-    const item = proyecto?.items.find(i => i.id === itemId)
-
-    if (!item) {
-      throw new Error(`Ítem con ID ${itemId} no encontrado en el proyecto ${proyectoId}.`)
+    if (proyecto) {
+      const item = proyecto.items.find(i => i.id === itemId)
+      if (item) {
+        item.gamaSeleccionada = gama
+        proyecto.actualizadoEn = new Date().toISOString()
+        void storageSet('proyectos_v1', proyectos.value)
+      }
     }
-
-    item.gamaSeleccionada = gama
-    await storageSet(STORAGE_KEY, proyectos.value)
   }
 
-  /**
-   * Actualiza la gama global de un proyecto.
-   */
-  async function setGamaGlobal(proyectoId: string, gama: Gama): Promise<void> {
+  function setGamaGlobal(proyectoId: string, gama: Gama): void {
     const proyecto = proyectos.value.find(p => p.id === proyectoId)
-    if (!proyecto) {
-      throw new Error(`Proyecto con ID ${proyectoId} no encontrado.`)
+    if (proyecto) {
+      proyecto.gamaGlobal = gama
+      proyecto.actualizadoEn = new Date().toISOString()
+      void storageSet('proyectos_v1', proyectos.value)
     }
-
-    proyecto.gamaGlobal = gama
-    await storageSet(STORAGE_KEY, proyectos.value)
   }
 
-  /**
-   * Calcula el progreso financiero de un proyecto específico.
-   */
-  const progresoDeProyecto = computed(() => (proyectoId: string): ProgresoProyecto => {
-    const proyecto = proyectos.value.find(p => p.id === proyectoId)
-    if (!proyecto) {
-      return { costoMinimo: 0, costoIdeal: 0, porcentajeMinimo: 0, porcentajeIdeal: 0 }
-    }
+  async function exportarJSON(): Promise<string> {
+    return serializarSnapshot(proyectos.value)
+  }
 
-    const itemsPendientes = proyecto.items.filter(
-      i => !i.yaLoTenemos && i.estado !== EstadoItem.Logrado
-    )
-
-    const costoMinimo = itemsPendientes
-      .filter(i => i.tipo === TipoItem.Obligatorio)
-      .reduce((sum, i) => sum + i.presupuestoGama[i.gamaSeleccionada], 0)
-
-    const costoIdeal = itemsPendientes
-      .reduce((sum, i) => sum + i.presupuestoGama[i.gamaSeleccionada], 0)
-
-    return {
-      costoMinimo,
-      costoIdeal,
-      porcentajeMinimo: costoMinimo > 0 
-        ? Math.min(100, (proyecto.ahorroActual / costoMinimo) * 100) 
-        : 100,
-      porcentajeIdeal: costoIdeal > 0 
-        ? Math.min(100, (proyecto.ahorroActual / costoIdeal) * 100) 
-        : 100,
-    }
-  })
+  async function importarJSON(jsonStr: string): Promise<void> {
+    const nuevosProyectos = deserializarSnapshot(jsonStr)
+    proyectos.value = nuevosProyectos
+    await storageSet('proyectos_v1', proyectos.value)
+  }
 
   return {
     proyectos,
     cargando,
+    progresoDeProyecto,
     cargarProyectos,
     guardarProyecto,
     eliminarProyecto,
@@ -165,6 +140,7 @@ export const useProyectosStore = defineStore('proyectos', () => {
     moverItem,
     setGamaItem,
     setGamaGlobal,
-    progresoDeProyecto,
+    exportarJSON,
+    importarJSON,
   }
 })
