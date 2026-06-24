@@ -1,9 +1,9 @@
-import type { CapacitorConfig } from '@capacitor/cli';
+import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
-  appId: 'io.ionic.starter',
-  appName: 'objetivos-economicos-app',
-  webDir: 'dist'
-};
+  appId: 'com.metas.financieras',
+  appName: 'Gestion de Metas',
+  webDir: 'dist',
+}
 
-export default config;
+export default config
