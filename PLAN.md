@@ -226,7 +226,7 @@ defineProps<{
 Usa `ion-progress-bar` con `:value="porcentaje / 100"`.  
 Muestra porcentaje formateado con `toFixed(1)`.
 
-#### 4.2 `GamaSelector.vue`
+#### 4.2 `GamaSelector.vue` ✅
 
 **Props:** `{ gamaActual: Gama, proyectoId: string, itemId: string }`  
 **Emits:** `update:gama(gama: Gama)`  
