@@ -184,7 +184,7 @@ Tests unitarios (vitest) para `progresoDeProyecto` con datos mockeados pasan al 
 
 ## MILESTONE 3 — Enrutamiento y Shell
 
-**Estado:** ⬜  
+**Estado:** ✅  
 **Toca archivos:**
 
 - `src/router/index.ts` ← MODIFICAR
