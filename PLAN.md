@@ -206,12 +206,12 @@ Tests unitarios (vitest) para `progresoDeProyecto` con datos mockeados pasan al 
 
 ## MILESTONE 4 — Componentes Atómicos
 
-**Estado:** ⬜  
+**Estado:** 🔄  
 **Toca archivos:** Todos los archivos en `src/components/`
 
 ### Orden de construcción (de menor a mayor complejidad)
 
-#### 4.1 `BarraProgreso.vue`
+#### 4.1 `BarraProgreso.vue` ✅
 
 **Props:**
 
